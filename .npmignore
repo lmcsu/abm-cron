@@ -1,0 +1,7 @@
+.idea/
+src/
+.editorconfig
+.eslintignore
+.eslintrc
+.gitignore
+gulpfile.js

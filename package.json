@@ -1,0 +1,29 @@
+{
+  "name": "abm-cron",
+  "version": "1.0.0",
+  "description": "A tiny library that parses Cron-like expressions and finds how many time has passed after the previous execution",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lmcsu/abm-cron.git"
+  },
+  "keywords": [
+    "cron"
+  ],
+  "author": "Alexander Berezin <alex@lmcx.ru> (https://letmecode.ru)",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/lmcsu/abm-cron/issues"
+  },
+  "homepage": "https://github.com/lmcsu/abm-cron#readme",
+  "devDependencies": {
+    "@babel/core": "^7.4.3",
+    "@babel/preset-env": "^7.4.3",
+    "eslint": "^5.16.0",
+    "gulp": "^4.0.1",
+    "gulp-babel": "^8.0.0"
+  }
+}
