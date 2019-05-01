@@ -34,6 +34,7 @@ const CRON_UNITS = [
         max: 12,
         defaultValue: '*',
         alt: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
+        lengths: [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
     },
     { // дни недели
         min: 0,
@@ -49,8 +50,43 @@ const CRON_UNITS = [
     },
 ];
 
+// порядковые юниты
+const CRON_UNITS_ORDERED = [
+    CRON_SECONDS_ID,
+    CRON_MINUTES_ID,
+    CRON_HOURS_ID,
+    CRON_DATES_ID,
+    CRON_MONTHS_ID,
+    CRON_YEARS_ID,
+];
+
+// функция конвертирует state в Date
+const stateToDate = (state) => {
+    const date = new Date(0);
+    date.setUTCFullYear(state[CRON_YEARS_ID]);
+    date.setUTCMonth(state[CRON_MONTHS_ID] - 1);
+    date.setUTCDate(state[CRON_DATES_ID]);
+    date.setUTCHours(state[CRON_HOURS_ID]);
+    date.setUTCMinutes(state[CRON_MINUTES_ID]);
+    date.setUTCSeconds(state[CRON_SECONDS_ID]);
+    return date;
+};
+
+// функция конвертирует Date в state
+const dateToState = (date) => {
+    return [
+        date.getUTCSeconds(),
+        date.getUTCMinutes(),
+        date.getUTCHours(),
+        date.getUTCDate(),
+        date.getUTCMonth() + 1,
+        date.getUTCDay(),
+        date.getUTCFullYear(),
+    ];
+};
+
 // функция парсинга cron-выражения
-const parseExpression = (str) => {
+const parse = (str) => {
     // заполнение массива по диапазону значений
     const fillRange = (from, to) => {
         const result = [];
@@ -86,8 +122,9 @@ const parseExpression = (str) => {
         // функция для считывания значения
         const parseNumber = (num) => {
             let result = num;
-            if (typeof altMap[num] !== 'undefined') {
-                result = altMap[num];
+            const alt = num.toUpperCase();
+            if (typeof altMap[alt] !== 'undefined') {
+                result = altMap[alt];
             }
             result = parseInt(result, 10);
             if (isNaN(result)) {
@@ -199,127 +236,221 @@ const parseExpression = (str) => {
     return values.map((value, unitId) => parseValue(value, unitId));
 };
 
-// функция поиска последнего совпадения времени спарсенного cron-выражения
-const lastRun = (exp, from = null) => {
-    // если from не задан, тогда берём текущее время
-    if (from === null) {
-        from = (new Date()).getTime();
-    }
+// функция поиска ближайшего совпадения времени спарсенного cron-выражения
+const nearestRun = (exp, timestamp = null, backward = true) => {
+    // заполняем state
+    const current = timestamp === null ? new Date() : new Date(timestamp); // дата отсчёта
+    const state = dateToState(current);
 
-    // переменные
-    let current = new Date(from); // текущая дата
-    let state; // текущее состояние
+    // функция устанавливает день недели в state, согласно дате в нём
+    const setDayOfWeek = () => {
+        const date = new Date();
+        date.setUTCFullYear(state[CRON_YEARS_ID]);
+        date.setUTCMonth(state[CRON_MONTHS_ID] - 1);
+        date.setUTCDate(state[CRON_DATES_ID]);
+        state[CRON_DAYS_ID] = date.getDay();
+    };
 
-    // функция обновления состояния согласно дате
-    const updateState = () => {
-        state = [
-            current.getUTCSeconds(),
-            current.getUTCMinutes(),
-            current.getUTCHours(),
-            current.getUTCDate(),
-            current.getUTCMonth() + 1,
-            current.getUTCDay(),
-            current.getUTCFullYear(),
-        ];
+    // функция проверки, является ли год високосным
+    const isLeapYear = (year) => ((year % 4 === 0) && (year % 100 !== 0)) || (year % 400 === 0);
+
+    // функция возвращает максимальную длину месяца
+    const getMonthMaxLength = (month, year) => {
+        let result = CRON_UNITS[CRON_MONTHS_ID].lengths[month - CRON_UNITS[CRON_MONTHS_ID].min];
+        if (month === 2 && isLeapYear(year)) {
+            result++;
+        }
+        return result;
     };
 
     // функция проверки, подходит ли текущее значение юнита
     const compared = (unitId) => exp[unitId].indexOf(state[unitId]) !== -1;
 
-    // функция отрезает лишнее от текущего времени
-    const cutTime = (unitId = -1) => {
-        if (unitId >= CRON_SECONDS_ID) {
-            current.setUTCSeconds(0);
-        }
-        if (unitId >= CRON_MINUTES_ID) {
-            current.setUTCMinutes(0);
-        }
-        if (unitId >= CRON_HOURS_ID) {
-            current.setUTCHours(0);
-        }
-        if (unitId >= CRON_DAYS_ID) {
-            current.setUTCDate(1);
-        }
-        if (unitId >= CRON_MONTHS_ID) {
-            current.setUTCMonth(0);
-        }
-
-        // отнимаем одну секунду, чтобы сбросить все значения на максимальные
-        // (хорошо, что в js отсутсвуют вещи вроде leap seconds)
-        current = new Date(current.getTime() - 1000);
-
-        // обновляем состояние
-        updateState();
-    };
-
-    // функция подбирает ближайший подходящий день
-    const findDay = () => {
-        for (let y = state[CRON_YEARS_ID]; y >= CRON_UNITS[CRON_YEARS_ID].min; y--) {
-            if (compared(CRON_YEARS_ID)) {
-                for (let m = state[CRON_MONTHS_ID]; m >= 1; m--) {
-                    if (compared(CRON_MONTHS_ID)) {
-                        for (let d = state[CRON_DATES_ID]; d >= 1; d--) {
-                            if (compared(CRON_DATES_ID) && compared(CRON_DAYS_ID)) {
-                                return true;
-                            }
-                            cutTime(CRON_HOURS_ID);
-                        }
-                    } else {
-                        cutTime(CRON_DAYS_ID);
-                    }
+    // функция фиксит state, если значения в нём выходят за рамки возможных
+    const stateFixBounds = (fromId = CRON_YEARS_ID) => {
+        for (let i = CRON_UNITS_ORDERED.indexOf(fromId); i < CRON_UNITS_ORDERED.length; i++) {
+            const id = CRON_UNITS_ORDERED[i];
+            const unit = CRON_UNITS[id];
+            const idNext = id === CRON_YEARS_ID ? false : CRON_UNITS_ORDERED[i + 1];
+            let min = unit.min;
+            let max = id === CRON_DATES_ID ?
+                getMonthMaxLength(state[CRON_MONTHS_ID], state[CRON_YEARS_ID]) :
+                unit.max;
+            let isMin = state[id] < min;
+            let isMax = state[id] > max;
+            if (isMin || isMax) {
+                if (id === CRON_YEARS_ID) {
+                    return false;
+                }
+                let value = isMin ? max : min;
+                if (isMin && id === CRON_DATES_ID) {
+                    value = 'MAX';
+                }
+                state[id] = value;
+                if (idNext !== false) {
+                    state[idNext] += isMin ? -1 : 1;
                 }
             } else {
-                cutTime(CRON_MONTHS_ID);
+                break;
             }
+        }
+        if (state[CRON_DATES_ID] === 'MAX') {
+            state[CRON_DATES_ID] = getMonthMaxLength(state[CRON_MONTHS_ID], state[CRON_YEARS_ID]);
+        }
+        return true;
+    };
+
+    // функция добавляет единицу к указанному значению в state
+    const stateAdd = (unitId) => {
+        state[unitId] += backward ? -1 : 1;
+
+        for (let i = CRON_UNITS_ORDERED.indexOf(unitId) - 1; i >= 0; i--) {
+            const id = CRON_UNITS_ORDERED[i];
+            const unit = CRON_UNITS[id];
+            let value = backward ? unit.max : unit.min;
+
+            if (backward && id === CRON_DATES_ID) {
+                value = getMonthMaxLength(state[CRON_MONTHS_ID], state[CRON_YEARS_ID]);
+            }
+
+            state[id] = value;
+        }
+
+        return true;
+    };
+
+    // функция перебора значений state
+    const stateSearch = (unitId, searchNext = false) => {
+        let min = CRON_UNITS[unitId].min;
+        let max = CRON_UNITS[unitId].max;
+        if (!backward && unitId === CRON_DATES_ID) {
+            max = getMonthMaxLength(state[CRON_MONTHS_ID], state[CRON_YEARS_ID]);
+        }
+        let i = state[unitId];
+        let isNext = !searchNext;
+        while (i >= min && i <= max) {
+            if (isNext && compared(unitId)) {
+                return true;
+            }
+            i += backward ? -1 : 1;
+            stateAdd(unitId);
+            isNext = true;
         }
         return false;
     };
 
-    // функция подбирает ближайшее подходящее время
+    // функция поиска ближайшего подходящего времени
     const findTime = () => {
-        for (let h = state[CRON_HOURS_ID]; h >= CRON_UNITS[CRON_HOURS_ID].min; h--) {
-            if (compared(CRON_HOURS_ID)) {
-                for (let m = state[CRON_MINUTES_ID]; m >= CRON_UNITS[CRON_MINUTES_ID].min; m--) {
-                    if (compared(CRON_MINUTES_ID)) {
-                        for (let s = state[CRON_SECONDS_ID]; s >= CRON_UNITS[CRON_SECONDS_ID].min; s--) {
-                            if (compared(CRON_SECONDS_ID)) {
-                                return true;
-                            }
-                            // вычитаем всего лишь одну секунду
-                            cutTime();
-                        }
-                    } else {
-                        cutTime(CRON_SECONDS_ID);
-                    }
+        let searchNextHours = false;
+        while (stateSearch(CRON_HOURS_ID, searchNextHours)) {
+            let searchNextMinutes = false;
+            while (stateSearch(CRON_MINUTES_ID, searchNextMinutes)) {
+                if (stateSearch(CRON_SECONDS_ID)) {
+                    return true;
                 }
-            } else {
-                cutTime(CRON_MINUTES_ID);
+                searchNextMinutes = true;
             }
+            searchNextHours = true;
+        }
+        return false;
+    };
+
+    // функция поиска ближайшей подходящей даты
+    const findDate = () => {
+        let searchNextYears = false;
+        while (stateSearch(CRON_YEARS_ID, searchNextYears)) {
+            let searchNextMonths = false;
+            while (stateSearch(CRON_MONTHS_ID, searchNextMonths)) {
+                let searchNextDays = false;
+                while (stateSearch(CRON_DATES_ID, searchNextDays)) {
+                    setDayOfWeek();
+                    if (compared(CRON_DAYS_ID)) {
+                        return true;
+                    }
+                    searchNextDays = true;
+                }
+                searchNextMonths = true;
+            }
+            searchNextYears = true;
         }
         return false;
     };
 
     // ищем подходящий день
-    updateState();
-    if (!findDay()) {
-        // если дня не существует
+    if (!findDate()) {
+        // если дня не найдено
         return false;
     }
 
-    // если время ещё не наступило, пытаемся продолжить искать со вчерашнего дня
+    // если время ещё не наступило, продолжаем искать со следующего дня
     if (!findTime()) {
-        if (!findDay()) {
-            // если дня не существует
+        stateAdd(CRON_DATES_ID);
+        if (!stateFixBounds(CRON_DATES_ID)) {
+            // если вышли за пределы возможных годов
+            return false;
+        }
+        if (!findDate()) {
+            // если дня не найдено
             return false;
         }
         findTime();
     }
 
-    // возвращаем количество времени, прошедшее с найденной текущей даты
-    return from - current.getTime();
+    return state;
+};
+
+// функция возвращает время до ближайшего запуска
+const nearestRunTime = (exp, timestamp = null, backward = true) => {
+    const current = timestamp === null ? new Date() : new Date(timestamp); // дата отсчёта
+
+    // получаем state
+    const state = nearestRun(exp, timestamp, backward);
+    if (state === false) {
+        return false;
+    }
+
+    const foundDate = stateToDate(state);
+
+    return Math.abs(foundDate.getTime() - current.getTime());
+};
+
+const lastRun = (exp, timestamp = null) => {
+    const state = nearestRun(exp, timestamp, true);
+
+    return state === false ? false : stateToDate(state);
+};
+
+const nextRun = (exp, timestamp = null) => {
+    const state = nearestRun(exp, timestamp, false);
+
+    return state === false ? false : stateToDate(state);
+};
+
+const lastRunElapsed = (exp, timestamp = null) => {
+    return nearestRunTime(exp, timestamp, true);
+};
+
+const nextRunRemains = (exp, timestamp = null) => {
+    return nearestRunTime(exp, timestamp, false);
+};
+
+const fits = (exp, timestamp = null) => {
+    const state = dateToState(timestamp === null ? new Date() : new Date(timestamp));
+    let result = true;
+    for (let i = 0; i < state.length; i++) {
+        if (exp[i].indexOf(state[i]) === -1) {
+            result = false;
+            break;
+        }
+    }
+    return result;
 };
 
 module.exports = {
-    parseExpression,
+    parse,
     lastRun,
+    nextRun,
+    lastRunElapsed,
+    nextRunRemains,
+    fits,
 };
