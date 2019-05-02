@@ -1,8 +1,8 @@
 {
   "name": "abm-cron",
-  "version": "1.1.0",
-  "description": "A tiny library that parses Cron-like expressions and finds its nearest time of run.",
-  "main": "dist/index.js",
+  "version": "1.2.0",
+  "description": "A compact library that parses cron-like expressions and finds its nearest time of run.",
+  "main": "dist/abm-cron.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -11,7 +11,10 @@
     "url": "git+https://github.com/lmcsu/abm-cron.git"
   },
   "keywords": [
-    "cron"
+    "cron",
+    "crontab",
+    "parser",
+    "parsing"
   ],
   "author": "Alexander Berezin <alex@lmcx.ru> (https://letmecode.ru)",
   "license": "UNLICENSED",
@@ -20,10 +23,14 @@
   },
   "homepage": "https://github.com/lmcsu/abm-cron#readme",
   "devDependencies": {
-    "@babel/core": "^7.4.3",
-    "@babel/preset-env": "^7.4.3",
+    "@babel/core": "^7.4.4",
+    "@babel/preset-env": "^7.4.4",
+    "babel-plugin-loop-optimizer": "^1.4.1",
     "eslint": "^5.16.0",
     "gulp": "^4.0.1",
-    "gulp-babel": "^8.0.0"
-  }
+    "gulp-babel": "^8.0.0",
+    "gulp-rename": "^1.4.0",
+    "gulp-uglify": "^3.0.2"
+  },
+  "dependencies": {}
 }

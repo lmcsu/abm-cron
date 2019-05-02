@@ -1,18 +1,35 @@
 const path = require('path');
 const gulp = require('gulp');
-const babel = require('gulp-babel');
+const gulpBabel = require('gulp-babel');
+const gulpRename = require('gulp-rename');
+const gulpUglify = require('gulp-uglify');
 
 const pathFix = (s) => {
     return s.replace('/', path.sep);
 };
 
-gulp.task('build', () =>
-    gulp.src(pathFix('./src/index.js'))
-        .pipe(babel({
-            presets: ['@babel/env'],
-        }))
+gulp.task('js:min', () =>
+    gulp.src(pathFix('./dist/abm-cron.js'))
+        .pipe(gulpUglify())
+        .pipe(gulpRename('abm-cron.min.js'))
         .pipe(gulp.dest(pathFix('./dist')))
 );
+
+gulp.task('js', () =>
+    gulp.src(pathFix('./src/index.js'))
+        .pipe(gulpBabel({
+            presets: [
+                '@babel/env',
+            ],
+            plugins: [
+                'babel-plugin-loop-optimizer',
+            ],
+        }))
+        .pipe(gulpRename('abm-cron.js'))
+        .pipe(gulp.dest(pathFix('./dist')))
+);
+
+gulp.task('build', gulp.series('js', 'js:min'));
 
 gulp.task('watch', () => {
     gulp.watch(pathFix('./src/*.js'), gulp.series('build'));

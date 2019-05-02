@@ -1,20 +1,31 @@
 # abm-cron
 
-A tiny library that parses Cron-like expressions and finds its nearest time of run.
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/lmcsu/abm-cron.svg)
+![npm bundle size](https://img.shields.io/bundlephobia/min/abm-cron.svg)
+![npm bundle size](https://img.shields.io/bundlephobia/minzip/abm-cron.svg)
+
+A compact library that parses cron-like expressions and finds its nearest time of run.
+Without any external dependencies.
 
 ## Install
 
-```
+#### Node.js
+```bash
 $ npm install abm-cron
 ```
+```js
+const abmCron = require('abm-cron');
+````
+#### Browser
+```html
+<script src="<your_path>/abm-cron.min.js"></script>
+```
 
-## Usage
+## Usage examples
 
 ```js
-const Cron = require('abm-cron');
-
 // returns arrays of all possible values
-const expr = Cron.parse('0 30 19 10-20 mar-sep MON-wed 2000,2050');
+const expr = abmCron.parse('0 30 19 10-20 mar-sep MON-wed 2000,2050');
 console.log(expr);
 // =>
 // [
@@ -28,27 +39,27 @@ console.log(expr);
 // ]
 
 // returns the date of the last run
-const lastRun = Cron.lastRun(expr);
+const lastRun = abmCron.lastRun(expr);
 console.log(lastRun);
 // => 2000-09-20T19:30:00.000Z
 
 // returns the date of the next run
-const nextRun = Cron.nextRun(expr);
+const nextRun = abmCron.nextRun(expr);
 console.log(nextRun);
 // => 2050-03-14T19:30:00.000Z
 
 // returns milliseconds passed from the previous run
-const lastRunElapsed = Cron.lastRunElapsed(expr);
+const lastRunElapsed = abmCron.lastRunElapsed(expr);
 console.log(lastRunElapsed);
 // ~> 586979507253
 
 // returns milliseconds remain until the next run
-const nextRunRemains = Cron.nextRunRemains(expr);
+const nextRunRemains = abmCron.nextRunRemains(expr);
 console.log(nextRunRemains);
 // ~> 974441292747
 
 // returns true if timestamp fits expression
-const fits = Cron.fits(expr, 2530899000000);
+const fits = abmCron.fits(expr, 2530899000000);
 console.log(fits);
 // => true
 ```
